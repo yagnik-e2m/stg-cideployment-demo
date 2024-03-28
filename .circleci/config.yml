@@ -1,0 +1,41 @@
+version: 2.1
+jobs:
+ build_and_deploy:
+   docker:
+     - image: cimg/node:18.18.1
+   steps:
+     - checkout
+     - run:
+         name: Husky git config
+         command: git config core.hooksPath .husky
+      
+     - run:
+         name: Install Node.js Dependencies
+         command: npm install husky --save-dev && npm install
+     - run:
+         name: Build NPM
+         command: npm run build
+     - run:
+         name: Install SSH and Rsync
+         command: sudo apt-get update && sudo apt-get install -y ssh rsync
+     - add_ssh_keys:
+         fingerprints:
+           - ${SSH_FINGERPRINTS}
+     - run:
+         name: Deploy to themes Kinsta
+         command: |
+           cd themes && rsync -avz --delete -e 'ssh -p ${KINSTA_SSH_PORT} -o StrictHostKeyChecking=no' --exclude '.git' --exclude '.circleci' ./ ${KINSTA_SSH_USER}@${KINSTA_SSH_HOST}:${KINSTA_DIR}/themes/
+     - run:
+         name: Deploy to plugins Kinsta
+         command: |
+           cd plugins/client-plugin && rsync -avz --delete -e 'ssh -p ${KINSTA_SSH_PORT} -o StrictHostKeyChecking=no' --exclude '.git' --exclude '.circleci' ./ ${KINSTA_SSH_USER}@${KINSTA_SSH_HOST}:${KINSTA_DIR}/plugins/client-plugin
+
+workflows:
+ version: 2
+ build_and_deploy:
+   jobs:
+     - build_and_deploy:
+         filters:
+           branches:
+             only:
+               - main 
